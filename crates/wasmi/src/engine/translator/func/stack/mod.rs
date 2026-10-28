@@ -462,6 +462,12 @@ impl Stack {
             IfReachability::OnlyThen | IfReachability::OnlyElse => return Ok(()),
         };
         self.trunc(frame.height());
+        // Truncation frees the register links of the popped temporaries, but a `local.set` or
+        // `local.tee` in the `then` block may have left a `RegisterLink::Local` behind, which
+        // truncation does not touch. Pushing the saved `else` operands below re-allocates those
+        // registers, so any such stale local link has to be discarded first or re-allocation would
+        // find the register still occupied (a debug-assert panic in `OperandStack::alloc_reg`).
+        self.operands.discard_local_regs();
         for else_operand in self.controls.pop_else_operands() {
             self.operands.push_operand(else_operand)?;
         }
